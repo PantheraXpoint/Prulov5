@@ -58,19 +58,7 @@ def parse_module_defs(d):
                 CBL_idx.append(named_m_bottle_cv1_bn)
                 # ignore_idx.append(named_m_bottle_cv1_bn)
                 ignore_idx.append(named_m_bottle_cv2_bn)  # not prune shortcut
-            from_to_map[named_m_cv3_bn] = [c3fromlayer[-1], named_m_cv2_bn]
-        elif m is Focus:
-            named_m_bn = named_m_base+'.conv.bn'
-            CBL_idx.append(named_m_bn)
-            fromlayer.append(named_m_bn)
-        elif m is SPP:
-            named_m_cv1_bn = named_m_base+'.cv1.bn'
-            named_m_cv2_bn = named_m_base+'.cv2.bn'
-            CBL_idx.append(named_m_cv1_bn)
-            ignore_idx.append(named_m_cv2_bn)
-            from_to_map[named_m_cv1_bn] = fromlayer[f]
-            from_to_map[named_m_cv2_bn] = [named_m_cv1_bn]*4
-            fromlayer.append(named_m_cv2_bn)    
+            from_to_map[named_m_cv3_bn] = [c3fromlayer[-1], named_m_cv2_bn]   
         elif m is SPPF:
             named_m_cv1_bn = named_m_base+'.cv1.bn'
             named_m_cv2_bn = named_m_base+'.cv2.bn'
@@ -210,16 +198,7 @@ def update_yaml_loop(d, name, maskconvdict):
             named_m_conv = named_m_base+'.conv'
             if name == named_m_conv:
                 args[-1] = maskconvdict[named_m_conv].sum().item() / c2
-        elif m is Focus:
-            c1, c2 = ch[f], args[0]
-            if c2 != no:  # if not output
-                if isinstance(args[-1],float):
-                    c2 = c2 * args[-1]
-                c2 = make_divisible(c2 * gw, 8)
-            named_m_conv = named_m_base+'.conv.conv'
-            if name == named_m_conv:
-                args[-1] = maskconvdict[named_m_conv].sum().item() / c2
-        elif m is SPP or m is SPPF:
+        elif m is SPPF:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
                 if isinstance(args[-1],float):

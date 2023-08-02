@@ -14,8 +14,8 @@ from yaml.events import NodeEvent
 from models.yolo import *
 from models.common import *
 from models.experimental import *
-from utils.general import set_logging
-from utils.torch_utils import select_device
+from device_utils.general import set_logging
+from device_utils.torch_utils import select_device
 from utils.prune_utils import *
 from utils.adaptive_bn import *
 

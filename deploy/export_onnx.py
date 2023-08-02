@@ -1,35 +1,47 @@
 # YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
-Export a YOLOv5 PyTorch model to onnx and TensorRT formats. Edit from https://github.com/ultralytics/yolov5/blob/master/export.py.
+Export a YOLOv5 PyTorch model to TorchScript, ONNX, CoreML, TensorFlow (saved_model, pb, TFLite, TF.js,) formats
+TensorFlow exports authored by https://github.com/zldrobit
 
+Usage:
+    $ python path/to/export.py --weights yolov5s.pt --include torchscript onnx coreml saved_model pb tflite tfjs
+
+Inference:
+    $ python path/to/detect.py --weights yolov5s.pt
+                                         yolov5s.onnx  (must export with --dynamic)
+                                         yolov5s_saved_model
+                                         yolov5s.pb
+                                         yolov5s.tflite
+
+TensorFlow.js:
+    $ cd .. && git clone https://github.com/zldrobit/tfjs-yolov5-example.git && cd tfjs-yolov5-example
+    $ npm install
+    $ ln -s ../../yolov5/yolov5s_web_model public/yolov5s_web_model
+    $ npm start
 """
 
 import argparse
 import os
 import sys
-
-import warnings
+import time
 from pathlib import Path
 
 import torch
 import torch.nn as nn
 
 FILE = Path(__file__).resolve()
-ROOT = os.path.dirname(FILE.parents[0]) # YOLOv5 root directory
+ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
-
-
 
 from models.common import Conv
 from models.experimental import attempt_load
 from models.yolo import Detect
 from utils.activations import SiLU
-from utils.general import (check_img_size, check_requirements, check_version, colorstr,
-                           file_size, print_args, url2file)
-from utils.torch_utils import select_device
-
+from device_utils.general import colorstr, check_img_size, check_requirements, file_size, print_args, \
+    set_logging, url2file
+from device_utils.torch_utils import select_device
 
 
 def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorstr('ONNX:')):
@@ -39,8 +51,10 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
         import onnx
 
         print(f'\n{prefix} starting export with onnx {onnx.__version__}...')
+        new_f = str(file).replace('pt','onnx')
+        file = Path(new_f)
+        print (file)
         f = file.with_suffix('.onnx')
-
         torch.onnx.export(model, im, f, verbose=False, opset_version=opset,
                           training=torch.onnx.TrainingMode.TRAINING if train else torch.onnx.TrainingMode.EVAL,
                           do_constant_folding=not train,
@@ -71,91 +85,40 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
             except Exception as e:
                 print(f'{prefix} simplifier failure: {e}')
         print(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
-        return f
+        print(f"{prefix} run --dynamic ONNX model inference with: 'python detect.py --weights {f}'")
     except Exception as e:
         print(f'{prefix} export failure: {e}')
 
 
-def export_engine(model, im, file, train, half, simplify, workspace=4, verbose=False, prefix=colorstr('TensorRT:')):
-    # YOLOv5 TensorRT export https://developer.nvidia.com/tensorrt
-    try:
-        check_requirements(('tensorrt',))
-        import tensorrt as trt
-
-        if trt.__version__[0] == '7':  # TensorRT 7 handling https://github.com/ultralytics/yolov5/issues/6012
-            grid = model.model[-1].anchor_grid
-            model.model[-1].anchor_grid = [a[..., :1, :1, :] for a in grid]
-            export_onnx(model, im, file, 12, train, False, simplify)  # opset 12
-            model.model[-1].anchor_grid = grid
-        else:  # TensorRT >= 8
-            check_version(trt.__version__, '8.0.0')  # require tensorrt>=8.0.0
-            export_onnx(model, im, file, 13, train, False, simplify)  # opset 13
-        onnx = file.with_suffix('.onnx')
-
-        print(f'\n{prefix} starting export with TensorRT {trt.__version__}...')
-        assert im.device.type != 'cpu', 'export running on CPU but must be on GPU, i.e. `python export.py --device 0`'
-        assert onnx.exists(), f'failed to export ONNX file: {onnx}'
-        f = file.with_suffix('.engine')  # TensorRT engine file
-        logger = trt.Logger(trt.Logger.INFO)
-        if verbose:
-            logger.min_severity = trt.Logger.Severity.VERBOSE
-
-        builder = trt.Builder(logger)
-        config = builder.create_builder_config()
-        config.max_workspace_size = workspace * 1 << 30
-        # config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace << 30)  # fix TRT 8.4 deprecation notice
-
-        flag = (1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
-        network = builder.create_network(flag)
-        parser = trt.OnnxParser(network, logger)
-        if not parser.parse_from_file(str(onnx)):
-            raise RuntimeError(f'failed to load ONNX file: {onnx}')
-
-        inputs = [network.get_input(i) for i in range(network.num_inputs)]
-        outputs = [network.get_output(i) for i in range(network.num_outputs)]
-        print(f'{prefix} Network Description:')
-        for inp in inputs:
-            print(f'{prefix}\tinput "{inp.name}" with shape {inp.shape} and dtype {inp.dtype}')
-        for out in outputs:
-            print(f'{prefix}\toutput "{out.name}" with shape {out.shape} and dtype {out.dtype}')
-
-        print(f'{prefix} building FP{16 if builder.platform_has_fast_fp16 else 32} engine in {f}')
-        if builder.platform_has_fast_fp16:
-            config.set_flag(trt.BuilderFlag.FP16)
-        with builder.build_engine(network, config) as engine, open(f, 'wb') as t:
-            t.write(engine.serialize())
-        print(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
-        return f
-    except Exception as e:
-        print(f'\n{prefix} export failure: {e}')
-
-
 @torch.no_grad()
-def run(
+def run(data=ROOT / 'data/coco128.yaml',  # 'dataset.yaml path'
         weights=ROOT / 'yolov5s.pt',  # weights path
         imgsz=(640, 640),  # image (height, width)
         batch_size=1,  # batch size
         device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+        include=('torchscript', 'onnx', 'coreml'),  # include formats
         half=False,  # FP16 half-precision export
         inplace=False,  # set YOLOv5 Detect() inplace=True
         train=False,  # model.train() mode
+        optimize=False,  # TorchScript: optimize for mobile
+        int8=False,  # CoreML/TF INT8 quantization
         dynamic=False,  # ONNX/TF: dynamic axes
         simplify=False,  # ONNX: simplify model
-        verbose=False,  # TensorRT: verbose log
-        workspace=4,  # TensorRT: workspace size (GB)
+        opset=12,  # ONNX: opset version
+        topk_per_class=100,  # TF.js NMS: topk per class to keep
+        topk_all=100,  # TF.js NMS: topk for all classes to keep
+        iou_thres=0.45,  # TF.js NMS: IoU threshold
+        conf_thres=0.25  # TF.js NMS: confidence threshold
         ):
-    file = Path(url2file(weights) if str(weights).startswith(('http:/', 'https:/')) else weights)  # PyTorch weights
+    t = time.time()
+    include = [x.lower() for x in include]
+    imgsz *= 2 if len(imgsz) == 1 else 1  # expand
+    file = Path(url2file(weights) if str(weights).startswith(('http:/', 'https:/')) else weights)
 
     # Load PyTorch model
     device = select_device(device)
     assert not (device.type == 'cpu' and half), '--half only compatible with GPU export, i.e. use --device 0'
     model = attempt_load(weights, map_location=device, inplace=True, fuse=True)  # load FP32 model
-    nc, names = model.nc, model.names  # number of classes, class names
-
-    # Checks
-    imgsz *= 2 if len(imgsz) == 1 else 1  # expand
-    assert nc == len(names), f'Model class count {nc} != len(names) {len(names)}'
-
     # Input
     gs = int(max(model.stride))  # grid size (max stride)
     imgsz = [check_img_size(x, gs) for x in imgsz]  # verify img_size are gs-multiples
@@ -172,41 +135,66 @@ def run(
         elif isinstance(m, Detect):
             m.inplace = inplace
             m.onnx_dynamic = dynamic
-            if hasattr(m, 'forward_export'):
-                m.forward = m.forward_export  # assign custom forward (optional)
+            # m.forward = m.forward_export  # assign forward (optional)
 
     for _ in range(2):
         y = model(im)  # dry runs
-    shape = tuple(y[0].shape)  # model output shape
-    print(f"\n{colorstr('PyTorch:')} starting from {file} with output shape {shape} ({file_size(file):.1f} MB)")
+    print(f"\n{colorstr('PyTorch:')} starting from {file} ({file_size(file):.1f} MB)")
 
-    # Exports
-    warnings.filterwarnings(action='ignore', category=torch.jit.TracerWarning)  # suppress TracerWarning
-    f = export_engine(model, im, file, train, half, simplify, workspace, verbose)
-    return f  # return list of exported files/dirs
+
+    export_onnx(model, im, file, opset, train, dynamic, simplify)
+
+
+
+    # Finish
+    print(f'\nExport complete ({time.time() - t:.2f}s)'
+          f"\nResults saved to {colorstr('bold', file.parent.resolve())}"
+          f'\nVisualize with https://netron.app')
 
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model.pt path(s)')
+    parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='dataset.yaml path')
+    parser.add_argument('--weights', type=str, default=ROOT / 'yolov5s.pt', help='weights path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640, 640], help='image (h, w)')
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--half', action='store_true', help='FP16 half-precision export')
     parser.add_argument('--inplace', action='store_true', help='set YOLOv5 Detect() inplace=True')
     parser.add_argument('--train', action='store_true', help='model.train() mode')
+    parser.add_argument('--optimize', action='store_true', help='TorchScript: optimize for mobile')
+    parser.add_argument('--int8', action='store_true', help='CoreML/TF INT8 quantization')
     parser.add_argument('--dynamic', action='store_true', help='ONNX/TF: dynamic axes')
     parser.add_argument('--simplify', action='store_true', help='ONNX: simplify model')
-    parser.add_argument('--verbose', action='store_true', help='TensorRT: verbose log')
-    parser.add_argument('--workspace', type=int, default=8, help='TensorRT: workspace size (GB)')
+    parser.add_argument('--opset', type=int, default=12, help='ONNX: opset version')
+    parser.add_argument('--topk-per-class', type=int, default=100, help='TF.js NMS: topk per class to keep')
+    parser.add_argument('--topk-all', type=int, default=100, help='TF.js NMS: topk for all classes to keep')
+    parser.add_argument('--iou-thres', type=float, default=0.45, help='TF.js NMS: IoU threshold')
+    parser.add_argument('--conf-thres', type=float, default=0.25, help='TF.js NMS: confidence threshold')
+    parser.add_argument('--include', nargs='+',
+                        default=['torchscript', 'onnx'],
+                        help='available formats are (torchscript, onnx, coreml, saved_model, pb, tflite, tfjs)')
     opt = parser.parse_args()
     print_args(FILE.stem, opt)
     return opt
 
 
 def main(opt):
-    for opt.weights in (opt.weights if isinstance(opt.weights, list) else [opt.weights]):
-        run(**vars(opt))
+    model_dir = '/quang/YOLOv5-pruning-A/'+str(opt.weights)+'/'
+    directory_path = Path(model_dir+'/pt/bn/')
+    for ff in directory_path.glob('*'):
+        if ff.is_file():
+            opt.weights = model_dir+'/pt/bn/'+ff.name
+            set_logging()
+            run(**vars(opt))
+    directory_path = Path(model_dir+'/pt/conv/')
+    for ff in directory_path.glob('*'):
+        if ff.is_file():
+            opt.weights = model_dir +'/pt/conv/' + ff.name
+            set_logging()
+            run(**vars(opt))
+    set_logging()
+    run(**vars(opt))
 
 
 if __name__ == "__main__":
