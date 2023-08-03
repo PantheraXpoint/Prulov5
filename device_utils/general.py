@@ -121,6 +121,16 @@ def emojis(str=''):
     # Return platform-dependent emoji-safe version of string
     return str.encode().decode('ascii', 'ignore') if platform.system() == 'Windows' else str
 
+def try_except(func):
+    # try-except function. Usage: @try_except decorator
+    def handler(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except Exception as e:
+            print(e)
+
+    return handler
+
 @try_except
 def check_requirements(requirements=ROOT / 'requirements.txt', exclude=(), install=True):
     # Check installed dependencies meet requirements (pass *.txt file or list of packages)
@@ -327,3 +337,4 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
             break  # time limit exceeded
 
     return output
+

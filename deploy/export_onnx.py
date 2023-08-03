@@ -30,7 +30,7 @@ import torch
 import torch.nn as nn
 
 FILE = Path(__file__).resolve()
-ROOT = FILE.parents[0]  # YOLOv5 root directory
+ROOT = FILE.parents[0].parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
@@ -180,7 +180,7 @@ def parse_opt():
 
 
 def main(opt):
-    model_dir = '/quang/YOLOv5-pruning-A/'+str(opt.weights)+'/'
+    model_dir = '/quang/Prulov5/'+str(opt.weights)+'/'
     directory_path = Path(model_dir+'/pt/bn/')
     for ff in directory_path.glob('*'):
         if ff.is_file():
