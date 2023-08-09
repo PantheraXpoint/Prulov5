@@ -11,6 +11,8 @@ import os
 import sys
 from pathlib import Path
 import numpy as np
+import time
+import csv
 
 
 import torch
@@ -183,7 +185,7 @@ def parse_opt():
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
-    parser.add_argument('--num-tensors', default=100, type=int,help='set number of test tensors')
+    parser.add_argument('--num-tensors', default=10, type=int,help='set number of test tensors')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(FILE.stem, opt)
@@ -191,8 +193,33 @@ def parse_opt():
 
 
 def main(opt):
-    check_requirements()
-    run(**vars(opt))
+    check_requirements(exclude=('tensorboard', 'thop'))
+    for opt.weights in (opt.weights if isinstance(opt.weights, list) else [opt.weights]):
+        # Split the path into segments
+        path_segments = opt.weights.split('/')
+
+        # Extract the last segment (conv or bn)
+        last_segment = path_segments[-2]
+
+        # Remove the last two segments
+        modified_path_segments = path_segments[:-2]
+
+        # Join the segments back together to form the modified path
+        modified_path = '/'.join(modified_path_segments)
+
+        raspberry_log = modified_path.replace('onnx','csv') + '/raspberry_' + last_segment +'.csv'
+
+        current_time = time.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Create the new row data
+        new_row = [opt.weights, current_time]
+
+        print(raspberry_log)
+
+        with open(raspberry_log, 'a+', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(new_row)
+        run(**vars(opt))
 
 
 if __name__ == "__main__":
