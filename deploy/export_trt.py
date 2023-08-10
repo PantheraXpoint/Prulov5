@@ -13,6 +13,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+import time
 
 FILE = Path(__file__).resolve()
 ROOT = os.path.dirname(FILE.parents[0]) # YOLOv5 root directory
@@ -25,7 +26,103 @@ from device_utils.general import (colorstr, file_size, print_args, url2file)
 from device_utils.torch_utils import select_device
 
 
+def onnx2trt_convert(
+    onnx_model_path: str,
+    trt_folder_path: str,
+    batch_size=1,
+    num_channels=3,
+    height=640,
+    width=640,
+    fp=16,
+    inference_ready=False,
+    logger=None,
+    dynamic_axes=True
+):
+    import tensorrt as trt
+    def log(msg):
+        if logger is None:
+            print(msg)
+            return
+        logger.debug(msg)
+    onnx_model_name = onnx_model_path.split('/')[-1].replace('.onnx', '')
+    trt_model_name = '{model_name}_batch_{batch_size}_fp{fp}'.format(
+        model_name=onnx_model_name,
+        batch_size=batch_size,
+        fp=fp
+    )
+    trt_model_path = os.path.join(trt_folder_path, trt_model_name + '.engine')
 
+    trt_logger = trt.Logger()
+    builder = trt.Builder(trt_logger)
+    explicit_batch = 1 << \
+        (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    network = builder.create_network(explicit_batch)
+    profile = builder.create_optimization_profile()
+    config = builder.create_builder_config()
+
+    parser = trt.OnnxParser(network, trt_logger)
+    log('Loading ONNX file from path {}...'.format(onnx_model_path))
+    with open(onnx_model_path, 'rb') as model:
+        log('Beginning ONNX file parsing.')
+        if not parser.parse(model.read()):
+            for error in range(parser.num_errors):
+                print(parser.get_error(error))
+
+    if parser.num_errors != 0:
+        log('Parsing errors found.')
+        return 1
+    else:
+        log('Completed parsing of ONNX file')
+        log('Building an engine from file; this may take a while...')
+
+    if fp == 16:
+        config.set_flag(trt.BuilderFlag.FP16)
+        log('Using fp{}'.format(fp))
+
+
+    inputs = [network.get_input(i) for i in range(network.num_inputs)]
+    outputs = [network.get_output(i) for i in range(network.num_outputs)]
+
+    for inp in inputs:
+        print(f'input "{inp.name}" with shape {inp.shape} and dtype {inp.dtype}')
+    for out in outputs:
+        print(f'output "{out.name}" with shape {out.shape} and dtype {out.dtype}')
+
+    input_tensor = network.get_input(0)
+    output_tensor = network.get_output(0)
+    profile.set_shape(
+        input_tensor.name,
+        (batch_size, num_channels, height, width),
+        (batch_size, num_channels, height, width),
+        (batch_size, num_channels, height, width)
+    )
+
+    log('The shape of input is {}'.format((
+        batch_size,
+        num_channels,
+        height,
+        width
+    )))
+
+    log('The shape of output is {}'.format(
+        output_tensor.shape
+    ))
+
+    config.add_optimization_profile(profile)
+
+
+    engine_string = builder.build_serialized_network(network, config) #difference
+    if engine_string is None:
+        log("Building the engine failed.")
+        return
+
+    log("Building the engine succeedeed.")
+    out_file = open(trt_model_path, 'wb')
+    out_file.write(engine_string)
+    out_file.close()
+    log('Engine file written to {}'.format(trt_model_path))
+    inputs.clear()
+    outputs.clear()
 
 def export_engine(im, file, workspace=4, verbose=False, prefix=colorstr('TensorRT:')):
     # YOLOv5 TensorRT export https://developer.nvidia.com/tensorrt
@@ -36,21 +133,40 @@ def export_engine(im, file, workspace=4, verbose=False, prefix=colorstr('TensorR
         print(f'\n{prefix} starting export with TensorRT {trt.__version__}...')
         assert im.device.type != 'cpu', 'export running on CPU but must be on GPU, i.e. `python export.py --device 0`'
         assert onnx.exists(), f'failed to export ONNX file: {onnx}'
+        new_f = str(file).replace('pt','onnx')
+        file = Path(new_f)
+        print (file)
         f = file.with_suffix('.engine')  # TensorRT engine file
         logger = trt.Logger(trt.Logger.INFO)
         if verbose:
             logger.min_severity = trt.Logger.Severity.VERBOSE
 
         builder = trt.Builder(logger)
-        config = builder.create_builder_config()
-        config.max_workspace_size = workspace * 1 << 30
-        # config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace << 30)  # fix TRT 8.4 deprecation notice
-
         flag = (1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
         network = builder.create_network(flag)
+        profile = builder.create_optimization_profile()  #edited
+        config = builder.create_builder_config()
+        # config.max_workspace_size = workspace << 30
+        # config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace << 30)  # fix TRT 8.4 deprecation notice
+
+        
+        
         parser = trt.OnnxParser(network, logger)
         if not parser.parse_from_file(str(onnx)):
             raise RuntimeError(f'failed to load ONNX file: {onnx}')
+        
+
+        if builder.platform_has_fast_fp16:
+            config.set_flag(trt.BuilderFlag.FP16)
+        
+        
+        inputTensor = network.get_input(0)  #edited
+        
+        profile.set_shape(inputTensor.name, (1, 3, 640, 640), \
+        	(1, 3, 640, 640), \
+        	(1, 3, 640, 640)) #edited
+        
+        config.add_optimization_profile(profile) #edited
 
         inputs = [network.get_input(i) for i in range(network.num_inputs)]
         outputs = [network.get_output(i) for i in range(network.num_outputs)]
@@ -61,12 +177,23 @@ def export_engine(im, file, workspace=4, verbose=False, prefix=colorstr('TensorR
             print(f'{prefix}\toutput "{out.name}" with shape {out.shape} and dtype {out.dtype}')
 
         print(f'{prefix} building FP{16 if builder.platform_has_fast_fp16 else 32} engine in {f}')
-        if builder.platform_has_fast_fp16:
-            config.set_flag(trt.BuilderFlag.FP16)
-        with builder.build_engine(network, config) as engine, open(f, 'wb') as t:
-            t.write(engine.serialize())
-        print(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
-        return f
+
+
+        # with builder.build_engine(network, config) as engine, open(f, 'wb') as t:
+        #     t.write(engine.serialize())
+        # print(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
+        # return f
+
+        engine_string = builder.build_serialized_network(network, config) #difference
+        if engine_string is None:
+            print("Building the engine failed.")
+            return
+
+        print("Building the engine succeedeed.")
+        out_file = open(f, 'wb')
+        out_file.write(engine_string)
+        out_file.close()
+        print('Engine file written to {}'.format(f))
     except Exception as e:
         print(f'\n{prefix} export failure: {e}')
 
@@ -78,7 +205,7 @@ def run(
         batch_size=1,  # batch size
         device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         inplace=False,  # set YOLOv5 Detect() inplace=True
-        dynamic=False,  # ONNX/TF: dynamic axes
+        dynamic=True,  # ONNX/TF: dynamic axes
         verbose=False,  # TensorRT: verbose log
         workspace=4,  # TensorRT: workspace size (GB)
         ):
@@ -111,9 +238,27 @@ def parse_opt():
 
 def main(opt):
     for opt.weights in (opt.weights if isinstance(opt.weights, list) else [opt.weights]):
-        run(**vars(opt))
+        model_dir = '/Prulov5/'+str(opt.weights)
+        directory_path = Path(model_dir+'/onnx/bn/')
+        print(directory_path)
+        for ff in directory_path.glob('*'):
+            if ff.is_file():
+                opt.weights = model_dir+'/onnx/bn/'+ff.name
+                onnx2trt_convert(opt.weights,model_dir+'/trt/bn/')
+                # run(**vars(opt))
+            time.sleep(10)
+        directory_path = Path(model_dir+'/onnx/conv/')
+        for ff in directory_path.glob('*'):
+            if ff.is_file():
+                opt.weights = model_dir +'/onnx/conv/' + ff.name
+                onnx2trt_convert(opt.weights,model_dir+'/trt/conv/')
+                # run(**vars(opt))
+            time.sleep(10)
+        # run(**vars(opt))
 
 
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
+    
+    # onnx2trt_convert('/Prulov5/yolov5n.onnx','/Prulov5/')

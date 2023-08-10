@@ -193,8 +193,8 @@ def main(opt):
             opt.weights = model_dir +'/pt/conv/' + ff.name
             set_logging()
             run(**vars(opt))
-    set_logging()
-    run(**vars(opt))
+    # set_logging()
+    # run(**vars(opt))
 
 
 if __name__ == "__main__":

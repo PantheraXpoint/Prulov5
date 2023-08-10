@@ -25,7 +25,6 @@ import numpy as np
 import pkg_resources as pkg
 import torch
 import torchvision
-import yaml
 
 
 # Settings

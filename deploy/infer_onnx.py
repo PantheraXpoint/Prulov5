@@ -103,8 +103,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         input_dict = {session.get_inputs()[0].name: img}
         input_arr = [session.get_outputs()[0].name]
         outputs = session.run(input_arr, input_dict)
-        print(outputs[0].shape)
-        pred = torch.tensor(outputs[0])
+
         t2 = time_sync()
         print("Converting Tensor:", t2-t1)
         # pred = torch.tensor(session.run(input_arr, input_dict))
@@ -113,6 +112,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         print("Inference speed:", t3-t1)
 
         # NMS
+        pred = torch.tensor(outputs[0])
         pred_ = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
         dt[2] += time_sync() - t3
 
