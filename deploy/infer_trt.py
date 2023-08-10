@@ -97,7 +97,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         agnostic_nms=False,  # class-agnostic NMS
         update=False,  # update all models
         half=False,  # use FP16 half-precision inference
-        num_tensors=1,
+        num_tensors=100,
         jetlog = None
         ):
 

@@ -23,7 +23,7 @@ def log_jetson_stats(interval=2, output_file='jetson_stats.csv'):
                         cpu_usage = process[6]
                         total_memory_usage_mb = process[7] / 1024
                         gpu_memory_usage_mb = process[8] / 1024
-                        print(process)
+                        # print(process)
 
                         # Write data to CSV
                         writer.writerow({
@@ -52,7 +52,7 @@ def log_power(interval=2, output_file='jetson_stats.csv'):
                     if process[9] == 'python3':
                         # Temperature
                         # Power
-                        print(jetson.power)
+                        # print(jetson.power)
                         current_time = int(time.time())
                         pid = process[0]
                         curr_cpu = jetson.power['rail']['POM_5V_CPU']['power']
