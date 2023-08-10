@@ -45,6 +45,8 @@ from device_utils.torch_utils import select_device
 
 
 def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorstr('ONNX:')):
+    dynamic = True
+    simplify = False
     # YOLOv5 ONNX export
     try:
         check_requirements(('onnx',))
@@ -55,13 +57,14 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
         file = Path(new_f)
         print (file)
         f = file.with_suffix('.onnx')
+        print(im.shape)
         torch.onnx.export(model, im, f, verbose=False, opset_version=opset,
                           training=torch.onnx.TrainingMode.TRAINING if train else torch.onnx.TrainingMode.EVAL,
                           do_constant_folding=not train,
                           input_names=['images'],
                           output_names=['output'],
-                          dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},  # shape(1,3,640,640)
-                                        'output': {0: 'batch', 1: 'anchors'}  # shape(1,25200,85)
+                          dynamic_axes={'images': {0: 'batch'},  # shape(1,3,640,640)
+                                        'output': {0: 'batch'}  # shape(1,25200,85)
                                         } if dynamic else None)
 
         # Checks
@@ -70,20 +73,20 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
         # print(onnx.helper.printable_graph(model_onnx.graph))  # print
 
         # Simplify
-        if simplify:
-            try:
-                check_requirements(('onnx-simplifier',))
-                import onnxsim
+        # if simplify:
+        #     try:
+        #         check_requirements(('onnx-simplifier',))
+        #         import onnxsim
 
-                print(f'{prefix} simplifying with onnx-simplifier {onnxsim.__version__}...')
-                model_onnx, check = onnxsim.simplify(
-                    model_onnx,
-                    dynamic_input_shape=dynamic,
-                    input_shapes={'images': list(im.shape)} if dynamic else None)
-                assert check, 'assert check failed'
-                onnx.save(model_onnx, f)
-            except Exception as e:
-                print(f'{prefix} simplifier failure: {e}')
+        #         print(f'{prefix} simplifying with onnx-simplifier {onnxsim.__version__}...')
+        #         model_onnx, check = onnxsim.simplify(
+        #             model_onnx,
+        #             dynamic_input_shape=dynamic,
+        #             input_shapes={'images': list(im.shape)} if dynamic else None)
+        #         assert check, 'assert check failed'
+        #         onnx.save(model_onnx, f)
+        #     except Exception as e:
+        #         print(f'{prefix} simplifier failure: {e}')
         print(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
         print(f"{prefix} run --dynamic ONNX model inference with: 'python detect.py --weights {f}'")
     except Exception as e:
@@ -102,7 +105,7 @@ def run(data=ROOT / 'data/coco128.yaml',  # 'dataset.yaml path'
         train=False,  # model.train() mode
         optimize=False,  # TorchScript: optimize for mobile
         int8=False,  # CoreML/TF INT8 quantization
-        dynamic=False,  # ONNX/TF: dynamic axes
+        dynamic=True,  # ONNX/TF: dynamic axes
         simplify=False,  # ONNX: simplify model
         opset=12,  # ONNX: opset version
         topk_per_class=100,  # TF.js NMS: topk per class to keep
@@ -110,6 +113,8 @@ def run(data=ROOT / 'data/coco128.yaml',  # 'dataset.yaml path'
         iou_thres=0.45,  # TF.js NMS: IoU threshold
         conf_thres=0.25  # TF.js NMS: confidence threshold
         ):
+    dynamic=True
+    simplify=False
     t = time.time()
     include = [x.lower() for x in include]
     imgsz *= 2 if len(imgsz) == 1 else 1  # expand
@@ -140,7 +145,7 @@ def run(data=ROOT / 'data/coco128.yaml',  # 'dataset.yaml path'
     for _ in range(2):
         y = model(im)  # dry runs
     print(f"\n{colorstr('PyTorch:')} starting from {file} ({file_size(file):.1f} MB)")
-
+    # print(dynamic,simplify)
 
     export_onnx(model, im, file, opset, train, dynamic, simplify)
 
@@ -193,8 +198,8 @@ def main(opt):
             opt.weights = model_dir +'/pt/conv/' + ff.name
             set_logging()
             run(**vars(opt))
-    set_logging()
-    run(**vars(opt))
+    # set_logging()
+    # run(**vars(opt))
 
 
 if __name__ == "__main__":
