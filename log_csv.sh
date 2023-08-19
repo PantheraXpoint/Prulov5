@@ -28,6 +28,6 @@ for file in "$onnx_path"/*; do
         # Wait for infer_trt.py to finish
         wait $infer_pid
 
-        sleep 5
+        sleep 90
     fi
 done
