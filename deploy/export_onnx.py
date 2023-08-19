@@ -192,12 +192,12 @@ def main(opt):
             opt.weights = model_dir+'/pt/bn/'+ff.name
             set_logging()
             run(**vars(opt))
-    directory_path = Path(model_dir+'/pt/conv/')
-    for ff in directory_path.glob('*'):
-        if ff.is_file():
-            opt.weights = model_dir +'/pt/conv/' + ff.name
-            set_logging()
-            run(**vars(opt))
+    # directory_path = Path(model_dir+'/pt/conv/')
+    # for ff in directory_path.glob('*'):
+    #     if ff.is_file():
+    #         opt.weights = model_dir +'/pt/conv/' + ff.name
+    #         set_logging()
+    #         run(**vars(opt))
     # set_logging()
     # run(**vars(opt))
 
