@@ -84,13 +84,22 @@ if __name__ == "__main__":
     output = sys.argv[1] if len(sys.argv) > 1 else None
     prune_type = sys.argv[2] if len(sys.argv) > 2 else None
     crawl_type = sys.argv[3] if len(sys.argv) > 3 else None
-    interval = sys.argv[4] if len(sys.argv) > 4 else None
+    provider = sys.argv[4] if len(sys.argv) > 4 else None
+    interval = sys.argv[5] if len(sys.argv) > 5 else None
+
+    if provider == 'cuda':
+        output = output + '/csv/cuda/'
+    elif provider == 'cpu':
+        output = output + '/csv/cpu/'
+    else:
+        output = output + '/csv/'
 
     if crawl_type == 'power':
-        output = output + '/csv/' + crawl_type + '_' + prune_type + '.csv'
+        output += crawl_type + '_' + prune_type + '.csv'
         log_power(output_file=output)
     else:
-        output = output + '/csv/' + "hardware_" + prune_type + '.csv'
+        output +=  "hardware_" + prune_type + '.csv'
         log_jetson_stats(output_file=output)
+
     # log_jetson_stats()
     

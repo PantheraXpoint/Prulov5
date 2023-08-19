@@ -118,14 +118,17 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     idx = 0
     path = 0
     row = ["Timestamp","Pre-processing", "Inference", "Post-processing"]
+
     with open(jetlog, 'a+', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(row)
+
     for _ in range(num_tensors + 1):
+
         t1 = time_sync()
         inputs, outputs, bindings, stream,size = allocate_buffers(model)
         t2 = time_sync()
-        if idx >= warmup - 1:
+        if idx >= warmup:
             dt[0] += t2 - t1
 
         # print("Pre-processing speed:", t2-t1)
@@ -151,7 +154,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         path += 1
 
         if idx >= warmup:
-            row = [str(t2-t1),str(t3-t2), str(t4-t3)]
+            row = [str(int(time.time())),str(t2-t1),str(t3-t2), str(t4-t3)]
             with open(jetlog, 'a+', newline='') as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(row)
@@ -162,7 +165,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     outputs.clear()
 
     # Print results
-    t = tuple(x / (num_tensors + 1 - warmup) * 1E3 for x in dt)  # speeds per image
+    t = tuple(x / (num_tensors + 1 - warmup) for x in dt)  # speeds per image
     print(f'\nSpeed: {t[0] + t[1] + t[2]:.1f}ms all; %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
     if update:
         strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
@@ -170,7 +173,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
     with open(jetlog, 'a+', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow([int(time.time()),str(t[0]),str(t[1]), str(t[2])])
+        writer.writerow([str(int(time.time())),str(t[0]),str(t[1]), str(t[2])])
 
     
     
@@ -187,7 +190,7 @@ def parse_opt():
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--update', action='store_true', help='update all models')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
-    parser.add_argument('--num-tensors', default=100, type=int,help='set number of test tensors')
+    parser.add_argument('--num-tensors', default=120, type=int,help='set number of test tensors')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(FILE.stem, opt)
@@ -195,7 +198,7 @@ def parse_opt():
 
 
 def main(opt):
-    check_requirements(exclude=('tensorboard', 'thop'))
+    # check_requirements(exclude=('tensorboard', 'thop'))
 
     for opt.weights in (opt.weights if isinstance(opt.weights, list) else [opt.weights]):
 

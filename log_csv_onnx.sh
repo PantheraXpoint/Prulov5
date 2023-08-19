@@ -3,8 +3,14 @@
 # Specify the directory paths
 model_ver="$1"
 prune_type="$2"
-trt_path="/Prulov5/${model_ver}/trt/${prune_type}"
-csv_path="/Prulov5/${model_ver}/csv"
+provider="$3"
+onnx_path="/Prulov5/${model_ver}/onnx/${prune_type}"
+
+if [ "$provider" == "cpu" ]; then
+    csv_path="/Prulov5/${model_ver}/csv/cpu"
+else
+    csv_path="/Prulov5/${model_ver}/csv/cuda"
+fi
 
 # chmod -R 777 /Prulov5/ 
 # python3 crawl.py "${csv_path}/jetson_${prune_type}.csv" &
@@ -15,7 +21,7 @@ csv_path="/Prulov5/${model_ver}/csv"
 
 
 # Loop through all files in the directory
-for file in "$trt_path"/*; do
+for file in "$onnx_path"/*; do
     if [ -f "$file" ]; then
         file_name=$(basename "$file")
 
@@ -24,8 +30,14 @@ for file in "$trt_path"/*; do
         # crawl_pid=$!
         
         # Run infer_trt.py in the background
-        python3 deploy/infer_trt.py --weights "$file" --device 0 &
-        infer_pid=$!
+        if [ "$provider" == "cpu" ]; then
+            python3 deploy/infer_onnx.py --weights "$file" --device 0 --provider cpu &
+            infer_pid=$!
+        else
+            python3 deploy/infer_onnx.py --weights "$file" --device 0 &
+            infer_pid=$!
+        fi
+
 
         # Wait for infer_trt.py to finish
         wait $infer_pid
@@ -33,7 +45,7 @@ for file in "$trt_path"/*; do
         # Kill both background processes
         # kill $crawl_pid
 
-        sleep 30
+        sleep 90
     fi
 done
 

@@ -51,6 +51,7 @@ def onnx2trt_convert(
         fp=fp
     )
     trt_model_path = os.path.join(trt_folder_path, trt_model_name + '.engine')
+    # workspace = 2000 # MB
 
     trt_logger = trt.Logger()
     builder = trt.Builder(trt_logger)
@@ -59,6 +60,8 @@ def onnx2trt_convert(
     network = builder.create_network(explicit_batch)
     profile = builder.create_optimization_profile()
     config = builder.create_builder_config()
+    # config.max_workspace_size = workspace << 20
+    # config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace << 20)
 
     parser = trt.OnnxParser(network, trt_logger)
     log('Loading ONNX file from path {}...'.format(onnx_model_path))
@@ -238,23 +241,24 @@ def parse_opt():
 
 def main(opt):
     for opt.weights in (opt.weights if isinstance(opt.weights, list) else [opt.weights]):
-        model_dir = '/Prulov5/'+str(opt.weights)
-        directory_path = Path(model_dir+'/onnx/bn/')
-        print(directory_path)
-        for ff in directory_path.glob('*'):
-            if ff.is_file():
-                opt.weights = model_dir+'/onnx/bn/'+ff.name
-                onnx2trt_convert(opt.weights,model_dir+'/trt/bn/')
-                # run(**vars(opt))
-            time.sleep(10)
-        directory_path = Path(model_dir+'/onnx/conv/')
-        for ff in directory_path.glob('*'):
-            if ff.is_file():
-                opt.weights = model_dir +'/onnx/conv/' + ff.name
-                onnx2trt_convert(opt.weights,model_dir+'/trt/conv/')
-                # run(**vars(opt))
-            time.sleep(10)
+        # model_dir = '/Prulov5/'+str(opt.weights)
+        # directory_path = Path(model_dir+'/onnx/bn/')
+        # print(directory_path)
+        # for ff in directory_path.glob('*'):
+        #     if ff.is_file():
+        #         opt.weights = model_dir+'/onnx/bn/'+ff.name
+        #         onnx2trt_convert(opt.weights,model_dir+'/trt/bn/')
+        #         # run(**vars(opt))
+        #     time.sleep(10)
+        # directory_path = Path(model_dir+'/onnx/conv/')
+        # for ff in directory_path.glob('*'):
+        #     if ff.is_file():
+        #         opt.weights = model_dir +'/onnx/conv/' + ff.name
+        #         onnx2trt_convert(opt.weights,model_dir+'/trt/conv/')
+        #         # run(**vars(opt))
+        #     time.sleep(10)
         # run(**vars(opt))
+        onnx2trt_convert(opt.weights, '/Prulov5/yolov5s/')
 
 
 if __name__ == "__main__":
