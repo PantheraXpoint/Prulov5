@@ -1,3 +1,14 @@
+'''
+The aim of this file is to remove the duplicated header in the logging file time.csv
+Example:
+Timestamp,Pre-processing,Inference,Post-processing
+Timestamp,Pre-processing,Inference,Post-processing
+
+HOW TO RUN:
+1. Get into the root folder: /Prulov5
+2. Edit the variable filename value so that its value is the directory to the file you want to remove duplicated headers
+3. Run the following command: "python3 tools/rm_duphead_csv.py"
+'''
 
 input_file = 'prulo_convlog/jetson/cuda/yolov5x/time_conv.csv'
 

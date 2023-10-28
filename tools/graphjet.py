@@ -6,8 +6,18 @@ from pathlib import Path
 import pandas as pd
 
 
+'''
+This file is to draw a graph for Jetson Nano logging data.
+Data path is in line 101. You can edit the data path according to inference mode (cuda, trt, cpu)
+HOW TO RUN:
+1. Access to the terminal of container 'prunv5'
+2. Edit the path variable in line 99
+3. Get into the root folder: /Prulov5
+4. Run the following command: "python tools/graphjet.py"
+'''
 
-def plot_clustered_stacked(tfall,dfall, labels=None, title="Inference Statistics on Jetson Nano (CPU)",  H="/", **kwargs):
+
+def plot_clustered_stacked(tfall,dfall, labels=None, title="Inference Statistics on Jetson Nano (CUDA)",  H="/", **kwargs):
     """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot. 
 labels is a list of the names of the dataframe, used for the legend
 title is a string for the title of the plot
@@ -88,7 +98,7 @@ H is the hatch used for identification of the different dataframe"""
     return axe
 
 
-path = 'prulo_convlog/jetson/cpu/'
+path = 'prulo_convlog/jetson/cuda/'
 directory_path = Path(path)
 
 # Initialize an empty list to store dataframes

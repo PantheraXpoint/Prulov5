@@ -5,6 +5,15 @@ import numpy as np
 from pathlib import Path
 import pandas as pd
 
+'''
+This file is to draw a graph for raspberry Pi logging data.
+Data path is in line 96.
+HOW TO RUN:
+1. Access to the terminal of container 'prunv5'
+2. Get into the root folder: /Prulov5
+3. Run the following command: "python tools/graphpi.py"
+'''
+
 
 
 def plot_clustered_stacked(tfall,dfall, labels=None, title="Inference Statistics on Raspberry Pi 4", **kwargs):

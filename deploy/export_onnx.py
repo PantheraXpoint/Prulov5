@@ -20,6 +20,15 @@ TensorFlow.js:
     $ npm start
 """
 
+'''
+The aim of this file is to export onnx files from pt files
+
+HOW TO RUN:
+1. Get into the root folder: /Prulov5
+2. Run the following command: "python deploy/export_onnx.py --device 0 --weights yolov5x"
+You can replace yolov5x with other yolo version (yolov5l , yolov5m, yolov5s, yolov5n)
+'''
+
 import argparse
 import os
 import sys

@@ -4,6 +4,18 @@ from pathlib import Path
 import argparse
 import csv
 
+'''
+This file is to partition 3 csv log files: hardware.csv, power.csv, time.csv  based on the model.csv because 3 csv log files contain
+logging data from many models from different pruning ratio. 
+
+HOW TO RUN: 
+1. Get into the root folder : /Prulov5
+2. Run the following command: "python3 tools/log_partition.py --path <dir to 4 csv files>"
+Example: "python3 tools/log_partition.py --path prulo_convlog/jetson/trt/yolov5n/"
+
+BE AWARE OF THE SYNTAX OF THE DIRECTORY
+'''
+
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory

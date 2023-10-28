@@ -6,6 +6,15 @@ Usage:
     $ python path/to/detect.py --source path/to/img.jpg --weights yolov5s.pt --img 640
 """
 
+'''
+This file aim is to log all the FLOPS of the pruned models according to a specific yolo model (x,l,m,n,s)
+HOW TO RUN:
+1. Access to the terminal of container 'prunv5'
+2. Run the following command: "python tools/flops.py --weights yolov5x --device 0"
+You can replace yolov5x with other yolo version (yolov5l , yolov5m, yolov5s, yolov5n). In order to see the FLOPS of pruned models using SlimBN method: 
+Refer to line 68-73 and insert the partition code from 79-83
+'''
+
 import argparse
 import os
 import sys
@@ -57,7 +66,7 @@ def main(opt):
     check_requirements(exclude=('tensorboard', 'thop'))
     for opt.weights in (opt.weights if isinstance(opt.weights, list) else [opt.weights]):
         model_dir = '/quang/Prulov5/'+str(opt.weights)
-        directory_path = Path(model_dir+'/pt/bn/')
+        # directory_path = Path(model_dir+'/pt/bn/')
         # for ff in directory_path.glob('*'):
         #     if ff.is_file():
         #         opt.weights = model_dir+'/pt/bn/'+ff.name

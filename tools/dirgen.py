@@ -3,7 +3,22 @@ import argparse
 from pathlib import Path
 import os
 import sys
-from device_utils.general import print_args
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0].parents[0]  # YOLOv5 root directory
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
+from utils.general import print_args
+
+'''
+This file aim is geeerate folder and subfolders in order to store models according to pruned type and file type.
+HOW TO RUN:
+1. Access to the terminal of container 'prunv5'
+2. Run the following command: "python tools/dirgen.py --model yolov5x"
+You can replace yolov5x with other yolo version (yolov5l , yolov5m, yolov5s, yolov5n).
+'''
 
 FILE = Path(__file__).resolve()
 ROOT = os.path.dirname(FILE.parents[0]) # YOLOv5 root directory
