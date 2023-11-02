@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# This file aim is generate hardware and power consumption stats during model inference.
+# HOW TO RUN:
+# 1. Access to the terminal of container 'prulov5j'.
+# 2. Run the following command: "./log_csv_trt.sh <model> <prune-type>", with:
+
+# ** <model>: model version name('yolov5l', 'yolov5x', 'yolov5m', 'yolov5s', 'yolov5n')
+# ** <prune-type>: pruning method such as 'bn' and 'conv'
+
 # Specify the directory paths
 model_ver="$1"
 prune_type="$2"

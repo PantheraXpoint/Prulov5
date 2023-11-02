@@ -1,4 +1,4 @@
-# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
+# YOLOv5 by Ultralytics, GPL-3.0 license
 """
 Export a YOLOv5 PyTorch model to onnx and TensorRT formats. Edit from https://github.com/ultralytics/yolov5/blob/master/export.py.
 
@@ -24,6 +24,16 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from device_utils.general import (colorstr, file_size, print_args, url2file)
 from device_utils.torch_utils import select_device
+
+'''
+This file aim is generate hardware and power consumption stats during model inference.
+HOW TO RUN:
+1. Access to the terminal of container 'prulov5j'.
+2. Run the following command: "python3 deploy/export_trt.py --weights <model> --device <gpu>", with:
+
+<model>: model version name('yolov5l', 'yolov5x', 'yolov5m', 'yolov5s', 'yolov5n')
+<gpu>: gpu index in the computer
+'''
 
 
 def onnx2trt_convert(
@@ -241,7 +251,8 @@ def parse_opt():
 
 def main(opt):
     for opt.weights in (opt.weights if isinstance(opt.weights, list) else [opt.weights]):
-        # model_dir = '/Prulov5/'+str(opt.weights)
+        model_dir = '/Prulov5/'+str(opt.weights)
+        print(model_dir)
         # directory_path = Path(model_dir+'/onnx/bn/')
         # print(directory_path)
         # for ff in directory_path.glob('*'):
@@ -250,19 +261,21 @@ def main(opt):
         #         onnx2trt_convert(opt.weights,model_dir+'/trt/bn/')
         #         # run(**vars(opt))
         #     time.sleep(10)
-        # directory_path = Path(model_dir+'/onnx/conv/')
-        # for ff in directory_path.glob('*'):
-        #     if ff.is_file():
-        #         opt.weights = model_dir +'/onnx/conv/' + ff.name
-        #         onnx2trt_convert(opt.weights,model_dir+'/trt/conv/')
-        #         # run(**vars(opt))
-        #     time.sleep(10)
-        # run(**vars(opt))
-        onnx2trt_convert(opt.weights, '/Prulov5/yolov5s/')
+        directory_path = Path(model_dir+'/onnx/conv/')
+        for ff in directory_path.glob('*'):
+            if ff.is_file():
+                opt.weights = model_dir +'/onnx/conv/' + ff.name
+                onnx2trt_convert(opt.weights,model_dir+'/trt/conv/')
+                # run(**vars(opt))
+            time.sleep(10)
+        run(**vars(opt))
+        # onnx2trt_convert(opt.weights, '/Prulov5/yolov5n/')
+        # print(ROOT)
 
 
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
+    # print(ROOT)
     
-    # onnx2trt_convert('/Prulov5/yolov5n.onnx','/Prulov5/')
+    # onnx2trt_convert('/Prulov5/yolov5n/yolov5n.onnx','/Prulov5/yolov5n/')

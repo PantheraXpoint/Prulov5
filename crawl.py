@@ -2,7 +2,19 @@ import csv
 import time
 import sys
 
+'''
+This file aim is generate hardware and power consumption stats during model inference.
+HOW TO RUN:
+1. Access to the terminal.
+2. Make sure to create "cuda" folder and "cpu" folder in folder "yolov5x/csv". You can replace the name yolov5x with other version names.
+3. Run the following command: "python3 crawl.py <model> <prune-type> <crawl-type> <provider> <interval>", with:
 
+** <model>: is model type ('yolov5x', 'yolov5l', 'yolov5m', 'yolov5n', 'yolov5s').
+** <prune-type>: is method of pruning ('bn' or 'conv').
+** <crawl-type>: whether 'hardware' or 'power', if you want to run both, you should create 2 terminals and run parallel.
+** <provider>: determine the hardware config you want to perform model inference on ('cuda', 'trt', 'cpu')
+** <interval>: the interval of time you want to log a stat (second(s) per log)
+'''
 
 def log_jetson_stats(interval=2, output_file='jetson_stats.csv'):
     try:
